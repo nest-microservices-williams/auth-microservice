@@ -3,13 +3,13 @@ import * as joi from 'joi';
 
 interface EnvVars {
   PORT: number;
-  // DATABASE_URL: string;
+  DATABASE_URL: string;
   NATS_SERVERS: string[];
 }
 
 const envVarsSchema = joi.object<EnvVars>({
   PORT: joi.number().default(3000),
-  // DATABASE_URL: joi.string().required(),
+  DATABASE_URL: joi.string().required(),
   NATS_SERVERS: joi.array().items(joi.string()).required(),
 });
 
@@ -43,6 +43,6 @@ const validatedEnv = validateEnv(envVarsSchema);
 
 export const envs: LowerCaseKeys<EnvVars> = {
   port: validatedEnv.PORT,
-  // database_url: validatedEnv.DATABASE_URL,
+  database_url: validatedEnv.DATABASE_URL,
   nats_servers: validatedEnv.NATS_SERVERS,
 };
