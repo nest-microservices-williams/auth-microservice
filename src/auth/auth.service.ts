@@ -1,12 +1,21 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from 'src/prisma/prisma.service';
-import { LoginUserDto, RegisterUserDto } from './dto';
 import { CustomRpcException } from 'src/common/exceptions/rpc.exception';
+import { JwtPayload } from './interfaces/jwt-payload.interface';
+import { LoginUserDto, RegisterUserDto } from './dto';
 
 @Injectable()
 export class AuthService {
-  constructor(private readonly prismaService: PrismaService) {}
+  constructor(
+    private readonly prismaService: PrismaService,
+    private readonly jwtService: JwtService,
+  ) {}
+
+  private signJwtToken(payload: JwtPayload) {
+    return this.jwtService.signAsync(payload);
+  }
 
   async registerUser(registerUserDto: RegisterUserDto) {
     const { name, email, password } = registerUserDto;
@@ -26,8 +35,11 @@ export class AuthService {
         select: { id: true, name: true, email: true },
       });
 
+      const token = await this.signJwtToken(newUser);
+
       return {
         user: newUser,
+        token,
       };
     } catch (error) {
       throw new CustomRpcException({
@@ -48,19 +60,30 @@ export class AuthService {
       });
 
       if (!user) {
-        throw new Error('Invalid credentials');
+        throw new CustomRpcException({
+          statusCode: HttpStatus.UNAUTHORIZED,
+          error: 'Unauthorized',
+          message: 'Invalid credentials',
+        });
       }
 
       const isPasswordValid = await bcrypt.compare(password, user.password);
 
       if (!isPasswordValid) {
-        throw new Error('Invalid credentials');
+        throw new CustomRpcException({
+          statusCode: HttpStatus.UNAUTHORIZED,
+          error: 'Unauthorized',
+          message: 'Invalid credentials',
+        });
       }
 
       delete user.password;
 
+      const token = await this.signJwtToken(user);
+
       return {
         user,
+        token,
       };
     } catch (error) {
       throw new CustomRpcException({

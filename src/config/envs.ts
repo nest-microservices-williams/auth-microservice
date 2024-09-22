@@ -5,12 +5,14 @@ interface EnvVars {
   PORT: number;
   DATABASE_URL: string;
   NATS_SERVERS: string[];
+  JWT_SECRET: string;
 }
 
 const envVarsSchema = joi.object<EnvVars>({
   PORT: joi.number().default(3000),
   DATABASE_URL: joi.string().required(),
   NATS_SERVERS: joi.array().items(joi.string()).required(),
+  JWT_SECRET: joi.string().required(),
 });
 
 function validateEnv<T>(
@@ -45,4 +47,5 @@ export const envs: LowerCaseKeys<EnvVars> = {
   port: validatedEnv.PORT,
   database_url: validatedEnv.DATABASE_URL,
   nats_servers: validatedEnv.NATS_SERVERS,
+  jwt_secret: validatedEnv.JWT_SECRET,
 };
