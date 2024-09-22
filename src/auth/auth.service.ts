@@ -38,8 +38,37 @@ export class AuthService {
     }
   }
 
-  loginUser(loginUserDto: LoginUserDto) {
-    return loginUserDto;
+  async loginUser(loginUserDto: LoginUserDto) {
+    const { email, password } = loginUserDto;
+
+    try {
+      const user = await this.prismaService.user.findUnique({
+        where: { email },
+        select: { id: true, name: true, email: true, password: true },
+      });
+
+      if (!user) {
+        throw new Error('Invalid credentials');
+      }
+
+      const isPasswordValid = await bcrypt.compare(password, user.password);
+
+      if (!isPasswordValid) {
+        throw new Error('Invalid credentials');
+      }
+
+      delete user.password;
+
+      return {
+        user,
+      };
+    } catch (error) {
+      throw new CustomRpcException({
+        statusCode: HttpStatus.BAD_REQUEST,
+        error: 'Bad Request',
+        message: error.message,
+      });
+    }
   }
 
   verifyUser(data: any) {
