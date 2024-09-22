@@ -8,6 +8,8 @@ import { LoginUserDto, RegisterUserDto } from './dto';
 
 @Injectable()
 export class AuthService {
+  private readonly expirationTime = 60000; // 1 minute
+
   constructor(
     private readonly prismaService: PrismaService,
     private readonly jwtService: JwtService,
@@ -35,7 +37,12 @@ export class AuthService {
         select: { id: true, name: true, email: true },
       });
 
-      const token = await this.signJwtToken(newUser);
+      const payload: JwtPayload = {
+        ...newUser,
+        userExpiresIn: Date.now() + this.expirationTime,
+      };
+
+      const token = await this.signJwtToken(payload);
 
       return {
         user: newUser,
@@ -79,7 +86,12 @@ export class AuthService {
 
       delete user.password;
 
-      const token = await this.signJwtToken(user);
+      const payload: JwtPayload = {
+        ...user,
+        userExpiresIn: Date.now() + this.expirationTime,
+      };
+
+      const token = await this.signJwtToken(payload);
 
       return {
         user,
@@ -94,7 +106,58 @@ export class AuthService {
     }
   }
 
-  verifyUser(data: any) {
-    return 'Verify user';
+  async verifyToken(token: string) {
+    try {
+      const payload = await this.jwtService.verifyAsync<JwtPayload>(token);
+
+      if (this.isTokenExpired(payload.userExpiresIn)) {
+        const user = await this.getUserById(payload.id);
+        return this.refreshToken(user);
+      }
+
+      return this.refreshToken(payload);
+    } catch (error) {
+      throw new CustomRpcException({
+        statusCode: HttpStatus.UNAUTHORIZED,
+        error: 'Unauthorized',
+        message: 'Invalid token',
+      });
+    }
+  }
+
+  private isTokenExpired(expiresIn: number): boolean {
+    return Date.now() > expiresIn;
+  }
+
+  private async getUserById(id: string) {
+    const user = await this.prismaService.user.findUnique({
+      where: { id },
+      select: { id: true, name: true, email: true },
+    });
+
+    if (!user) {
+      throw new CustomRpcException({
+        statusCode: HttpStatus.UNAUTHORIZED,
+        error: 'Unauthorized',
+        message: 'User not found',
+      });
+    }
+
+    return user;
+  }
+
+  private async refreshToken(user: Omit<JwtPayload, 'userExpiresIn'>) {
+    const newUser = { id: user.id, name: user.name, email: user.email };
+    const newPayload: JwtPayload = {
+      ...newUser,
+      userExpiresIn: Date.now() + this.expirationTime,
+    };
+
+    const newToken = await this.signJwtToken(newPayload);
+
+    return {
+      user: newUser,
+      token: newToken,
+    };
   }
 }
