@@ -12,6 +12,9 @@ RUN npm install
 # ? Stage 2: Build the app
 FROM node:lts-alpine AS builder
 
+ARG AUTH_MICROSERVICE_DATABASE_URL
+ENV DATABASE_URL=$AUTH_MICROSERVICE_DATABASE_URL
+
 WORKDIR /usr/src/app
 
 # Copy node_modules from deps stage
@@ -20,14 +23,17 @@ COPY --from=deps /usr/src/app/node_modules ./node_modules
 # Copy source code
 COPY . .
 
+# Install Prisma CLI
+RUN npx prisma generate
+
+# Apply migrations
+RUN npx prisma db push
+
 # Build the app
 RUN npm run build
 
 # Install only production dependencies
 RUN npm ci --only=production && npm cache clean --force
-
-# Install Prisma CLI
-RUN npx prisma generate
 
 # ? Stage 3: Run the app
 FROM node:lts-alpine AS runner
